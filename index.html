@@ -131,10 +131,33 @@ async function scan(){
      const data=await sendAttendance(id);
      statusBox.textContent="✅ Berhasil: "+data.name+" ("+data.waktu+")";
      if("speechSynthesis" in window){
-      speechSynthesis.cancel();
-      speechSynthesis.speak(new SpeechSynthesisUtterance(
-       "Terima kasih, "+data.name+". Selamat datang."
-      ));
+      
+speechSynthesis.cancel();
+
+const ucapan = new SpeechSynthesisUtterance(
+  "Terima kasih, " + data.name + ". Selamat datang."
+);
+
+ucapan.lang = "id-ID";
+
+const daftarSuara = speechSynthesis.getVoices();
+
+const suaraPerempuan = daftarSuara.find(v =>
+  v.lang.toLowerCase().startsWith("id") &&
+  /female|woman|perempuan|wanita/i.test(v.name)
+);
+
+const suaraIndonesia = daftarSuara.find(v =>
+  v.lang.toLowerCase().startsWith("id")
+);
+
+if (suaraPerempuan) {
+  ucapan.voice = suaraPerempuan;
+} else if (suaraIndonesia) {
+  ucapan.voice = suaraIndonesia;
+}
+
+speechSynthesis.speak(ucapan);
      }
     }catch(e){
      statusBox.textContent="❌ "+e.message;
