@@ -177,7 +177,7 @@ if ("speechSynthesis" in window) {
   speechSynthesis.speak(ucapan);
 }
      }
-    }catch(e){
+    catch(e){
      statusBox.textContent="❌ "+e.message;
     }
     setTimeout(()=>{busy=false;},2000);
