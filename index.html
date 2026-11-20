@@ -1,0 +1,150 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pemindai QR TK Al Muhajirin</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#f1f5f9;text-align:center;padding:20px}
+main{max-width:520px;margin:auto;background:white;padding:22px;border-radius:16px}
+h2{color:#176b45}
+video{width:100%;border-radius:12px;background:#222}
+button{padding:13px 20px;margin:8px;border:0;border-radius:9px;background:#176b45;color:white;font-size:16px}
+#status{padding:12px;margin-top:12px;background:#eef6ee;border-radius:8px}
+</style>
+</head>
+<body>
+<main>
+<h2>📷 Absensi QR TK Al Muhajirin</h2>
+<p>Arahkan kartu QR ke kamera.</p>
+<video id="video" playsinline muted></video>
+<br>
+<button id="start">Mulai Kamera</button>
+<button id="stop">Hentikan</button>
+<div id="status">Kamera belum diaktifkan.</div>
+</main>
+<canvas id="canvas" hidden></canvas>
+
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbwBtUnU7dFZrnlrBOFEjWNO57rO5JE8E5HTpmEaMhKMLeL5XOLpWWM93oO8lV2E9NRf/exec";
+
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const statusBox=document.getElementById("status");
+
+let stream=null;
+let scanning=false;
+let busy=false;
+let lastCode="";
+let lastTime=0;
+
+function sendAttendance(id){
+ return new Promise((resolve,reject)=>{
+  const callback="qrCallback_"+Date.now();
+  const script=document.createElement("script");
+  const timer=setTimeout(()=>{
+   cleanup();
+   reject(new Error("Waktu koneksi habis. Coba lagi."));
+  },15000);
+
+  function cleanup(){
+   clearTimeout(timer);
+   delete window[callback];
+   script.remove();
+  }
+
+  window[callback]=(response)=>{
+   cleanup();
+   if(response && response.success) resolve(response.data);
+   else reject(new Error(response?.message || "Pencatatan gagal"));
+  };
+
+  script.onerror=()=>{
+   cleanup();
+   reject(new Error("Tidak dapat terhubung ke server."));
+  };
+
+  const url=new URL(API_URL);
+  url.searchParams.set("action","record");
+  url.searchParams.set("id",id);
+  url.searchParams.set("status","Hadir");
+  url.searchParams.set("callback",callback);
+  script.src=url.toString();
+  document.body.appendChild(script);
+ });
+}
+
+document.getElementById("start").onclick=async()=>{
+ try{
+  if(!navigator.mediaDevices?.getUserMedia){
+   throw new Error("Browser tidak mendukung akses kamera.");
+  }
+  if(!window.isSecureContext){
+   throw new Error("Halaman harus dibuka melalui HTTPS.");
+  }
+  stream=await navigator.mediaDevices.getUserMedia({
+   video:{facingMode:{ideal:"environment"}},
+   audio:false
+  });
+  video.srcObject=stream;
+  await video.play();
+  scanning=true;
+  statusBox.textContent="Kamera aktif. Silakan scan QR.";
+  requestAnimationFrame(scan);
+ }catch(e){
+  statusBox.textContent="Kamera gagal dibuka: "+e.message;
+ }
+};
+
+document.getElementById("stop").onclick=()=>{
+ scanning=false;
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+ stream=null;
+ statusBox.textContent="Kamera dihentikan.";
+};
+
+async function scan(){
+ if(!scanning)return;
+
+ if(video.readyState>=2 && !busy){
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+  const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const result=jsQR(frame.data,frame.width,frame.height);
+
+  if(result && result.data){
+   const id=result.data.trim();
+   const now=Date.now();
+
+   if(id!==lastCode || now-lastTime>3000){
+    busy=true;
+    lastCode=id;
+    lastTime=now;
+    statusBox.textContent="Mencatat QR: "+id;
+
+    try{
+     const data=await sendAttendance(id);
+     statusBox.textContent="✅ Berhasil: "+data.name+" ("+data.waktu+")";
+     if("speechSynthesis" in window){
+      speechSynthesis.cancel();
+      speechSynthesis.speak(new SpeechSynthesisUtterance(
+       "Terima kasih, "+data.name+". Selamat datang."
+      ));
+     }
+    }catch(e){
+     statusBox.textContent="❌ "+e.message;
+    }
+    setTimeout(()=>{busy=false;},2000);
+   }
+  }
+ }
+ if(scanning)requestAnimationFrame(scan);
+}
+</script>
+</body>
+</html>
