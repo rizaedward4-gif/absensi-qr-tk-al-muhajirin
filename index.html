@@ -130,34 +130,52 @@ async function scan(){
     try{
      const data=await sendAttendance(id);
      statusBox.textContent="✅ Berhasil: "+data.name+" ("+data.waktu+")";
-     if("speechSynthesis" in window){
-      
-speechSynthesis.cancel();
+if ("speechSynthesis" in window) {
+  speechSynthesis.cancel();
 
-const ucapan = new SpeechSynthesisUtterance(
-  "Terima kasih, " + data.name + ". Selamat datang."
-);
+  const waktu = String(data.waktu || "07:00:00");
+  const bagian = waktu.split(":");
+  const totalMenit = Number(bagian[0]) * 60 + Number(bagian[1]);
 
-ucapan.lang = "id-ID";
+  let pesan = "";
 
-const daftarSuara = speechSynthesis.getVoices();
+  if (totalMenit <= 435) {
+    pesan = "Luar biasa! " + data.name +
+      ", datang tepat waktu. Guru hebat menjadi teladan disiplin. Terima kasih!";
+  } else if (totalMenit <= 450) {
+    pesan = "Selamat pagi, " + data.name +
+      ". Terima kasih sudah hadir. Besok kita usahakan datang lebih awal, ya.";
+  } else if (totalMenit <= 465) {
+    pesan = "Halo, " + data.name +
+      ". Waktu terus berjalan. Mari kita tingkatkan kedisiplinan.";
+  } else if (totalMenit <= 479) {
+    pesan = "Perhatian, " + data.name +
+      ". Anak-anak sudah menunggu kehadiran guru. Mari lebih menghargai waktu.";
+  } else {
+    pesan = "Wah, " + data.name +
+      ". Sudah lewat pukul delapan. Jangan sampai kebiasaan terlambat menjadi budaya. Yuk, perbaiki!";
+  }
 
-const suaraPerempuan = daftarSuara.find(v =>
-  v.lang.toLowerCase().startsWith("id") &&
-  /female|woman|perempuan|wanita/i.test(v.name)
-);
+  const ucapan = new SpeechSynthesisUtterance(pesan);
+  ucapan.lang = "id-ID";
 
-const suaraIndonesia = daftarSuara.find(v =>
-  v.lang.toLowerCase().startsWith("id")
-);
+  const daftarSuara = speechSynthesis.getVoices();
+  const suaraPerempuan = daftarSuara.find(v =>
+    v.lang.toLowerCase().startsWith("id") &&
+    /female|perempuan|google indonesia/i.test(v.name)
+  );
+  const suaraIndonesia = daftarSuara.find(v =>
+    v.lang.toLowerCase().startsWith("id")
+  );
 
-if (suaraPerempuan) {
-  ucapan.voice = suaraPerempuan;
-} else if (suaraIndonesia) {
-  ucapan.voice = suaraIndonesia;
+  if (suaraPerempuan) {
+    ucapan.voice = suaraPerempuan;
+  } else if (suaraIndonesia) {
+    ucapan.voice = suaraIndonesia;
+  }
+
+  speechSynthesis.speak(ucapan);
 }
-
-speechSynthesis.speak(ucapan);
      }
     }catch(e){
      statusBox.textContent="❌ "+e.message;
